@@ -6,7 +6,6 @@ import webpush from "web-push";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import multer from "multer";
-import cron from "node-cron";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
 
@@ -409,8 +408,8 @@ app.post("/notify", authenticateToken, async (req, res) => {
   res.status(200).json({ message: "Notifications sent" });
 });
 
-// --- CRON JOB (Every day at 08:00 AM) ---
-cron.schedule('0 8 * * *', async () => {
+// --- VERCEL CRON JOB (Every day at 08:00 AM) ---
+app.get('/cron', async (req, res) => {
   console.log("Menjalankan cron job untuk pengingat tugas besok...");
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -423,7 +422,9 @@ cron.schedule('0 8 * * *', async () => {
     .eq("deadline", tomorrowStr)
     .neq("status", "Selesai");
 
-  if (error || !assignments || assignments.length === 0) return;
+  if (error || !assignments || assignments.length === 0) {
+      return res.status(200).json({ message: "No assignments due tomorrow" });
+  }
 
   for (const task of assignments) {
     const userId = task.courses.user_id;
@@ -440,9 +441,8 @@ cron.schedule('0 8 * * *', async () => {
       webpush.sendNotification(pushSubscription, payload).catch(err => console.error("Error pushing notification via cron", err));
     });
   }
+
+  res.status(200).json({ message: "Cron executed successfully" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server berjalan di port ${PORT}`);
-});
+export default app;

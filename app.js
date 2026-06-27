@@ -1,6 +1,6 @@
 // Configuration
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_URL = isLocalhost ? 'http://localhost:3000' : 'https://your-backend.onrender.com'; // Replace when deployed
+const API_URL = isLocalhost ? 'http://localhost:3000' : ''; // Use relative path for Vercel
 
 // UI State Management
 const navBtns = document.querySelectorAll('.nav-btn');
