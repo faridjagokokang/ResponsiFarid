@@ -332,10 +332,30 @@ async function fetchAdminUsers() {
                 <td>${DOMPurify.sanitize(u.fakultas || '-')}</td>
                 <td>${DOMPurify.sanitize(u.kampus || '-')}</td>
                 <td><span style="background: ${u.role === 'admin' ? '#fca5a5' : '#818cf8'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${DOMPurify.sanitize(u.role)}</span></td>
+                <td>
+                    <button class="btn-cancel" onclick="deleteAdminUser('${u.id}')" style="padding: 4px 8px; font-size: 0.8rem; margin: 0;">Hapus</button>
+                </td>
             </tr>
         `).join('');
     } catch (error) {
         console.error('Error fetching admin users:', error);
+    }
+}
+
+async function deleteAdminUser(id) {
+    if (!confirm('Yakin ingin menghapus pengguna ini secara permanen?')) return;
+    
+    try {
+        const res = await authFetch(`/admin/users/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Pengguna berhasil dihapus', 'success');
+            fetchAdminUsers();
+        } else {
+            const data = await res.json();
+            showToast(data.error || 'Gagal menghapus pengguna', 'error');
+        }
+    } catch (error) {
+        showToast('Terjadi kesalahan', 'error');
     }
 }
 

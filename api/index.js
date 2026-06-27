@@ -192,6 +192,16 @@ app.get("/api/admin/users", authenticateToken, async (req, res) => {
   res.json(data);
 });
 
+app.delete("/api/admin/users/:id", authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: "Forbidden: Admin only" });
+  // Cannot delete yourself
+  if (req.user.id === req.params.id) return res.status(400).json({ error: "Cannot delete your own account" });
+  
+  const { error } = await supabase.from("users").delete().eq("id", req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(204).send();
+});
+
 // --- COURSES CRUD ---
 app.get("/api/courses", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("courses").select("*").eq("user_id", req.user.id);
