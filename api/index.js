@@ -57,7 +57,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.post("/auth/register", upload.single("foto"), async (req, res) => {
+app.post("/api/auth/register", upload.single("foto"), async (req, res) => {
   const { name, email, password, prodi, fakultas, kampus } = req.body;
   if (!name || !email || !password || !prodi || !fakultas || !kampus || !req.file) {
     return res.status(400).json({ error: "Semua field dan foto harus diisi" });
@@ -102,7 +102,7 @@ app.post("/auth/register", upload.single("foto"), async (req, res) => {
   }
 });
 
-app.post("/auth/login", loginLimiter, async (req, res) => {
+app.post("/api/auth/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Email dan password harus diisi" });
 
@@ -132,7 +132,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-app.post("/auth/forgot-password", async (req, res) => {
+app.post("/api/auth/forgot-password", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email harus diisi" });
 
@@ -160,7 +160,7 @@ app.post("/auth/forgot-password", async (req, res) => {
   }
 });
 
-app.post("/auth/reset-password", async (req, res) => {
+app.post("/api/auth/reset-password", async (req, res) => {
   const { token, newPassword } = req.body;
   if (!token || !newPassword) return res.status(400).json({ error: "Token dan password baru harus diisi" });
 
@@ -178,14 +178,14 @@ app.post("/auth/reset-password", async (req, res) => {
 });
 
 // --- USERS CRUD ---
-app.get("/users/me", authenticateToken, async (req, res) => {
+app.get("/api/users/me", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("users").select("id, name, email").eq("id", req.user.id).single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 // --- ADMIN ROUTE ---
-app.get("/admin/users", authenticateToken, async (req, res) => {
+app.get("/api/admin/users", authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: "Forbidden: Admin only" });
   const { data, error } = await supabase.from("users").select("id, name, email, prodi, fakultas, kampus, foto_url, created_at, role");
   if (error) return res.status(500).json({ error: error.message });
@@ -193,19 +193,19 @@ app.get("/admin/users", authenticateToken, async (req, res) => {
 });
 
 // --- COURSES CRUD ---
-app.get("/courses", authenticateToken, async (req, res) => {
+app.get("/api/courses", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("courses").select("*").eq("user_id", req.user.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.get("/courses/:id", authenticateToken, async (req, res) => {
+app.get("/api/courses/:id", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("courses").select("*").eq("id", req.params.id).eq("user_id", req.user.id).single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.post("/courses", authenticateToken, async (req, res) => {
+app.post("/api/courses", authenticateToken, async (req, res) => {
   const { course_name, lecturer, credits, semester } = req.body;
   if (!course_name || !lecturer || !credits || !semester) return res.status(400).json({ error: "Data tidak lengkap" });
 
@@ -217,7 +217,7 @@ app.post("/courses", authenticateToken, async (req, res) => {
   res.status(201).json(data[0]);
 });
 
-app.put("/courses/:id", authenticateToken, async (req, res) => {
+app.put("/api/courses/:id", authenticateToken, async (req, res) => {
   const { course_name, lecturer, credits, semester } = req.body;
   const { data, error } = await supabase.from("courses").update({ course_name, lecturer, credits, semester })
     .eq("id", req.params.id).eq("user_id", req.user.id).select();
@@ -225,7 +225,7 @@ app.put("/courses/:id", authenticateToken, async (req, res) => {
   res.json(data[0]);
 });
 
-app.delete("/courses/:id", authenticateToken, async (req, res) => {
+app.delete("/api/courses/:id", authenticateToken, async (req, res) => {
   const { error } = await supabase.from("courses").delete().eq("id", req.params.id).eq("user_id", req.user.id);
   if (error) return res.status(500).json({ error: error.message });
   res.status(204).send();
@@ -238,7 +238,7 @@ async function verifyUserCourse(course_id, user_id) {
     return !!data;
 }
 
-app.get("/schedules", authenticateToken, async (req, res) => {
+app.get("/api/schedules", authenticateToken, async (req, res) => {
   // Join with courses, but filter where course belongs to user
   const { data: courses } = await supabase.from("courses").select("id").eq("user_id", req.user.id);
   const courseIds = courses ? courses.map(c => c.id) : [];
@@ -250,13 +250,13 @@ app.get("/schedules", authenticateToken, async (req, res) => {
   res.json(data);
 });
 
-app.get("/schedules/:id", authenticateToken, async (req, res) => {
+app.get("/api/schedules/:id", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("schedules").select("*, courses!inner(user_id)").eq("id", req.params.id).eq("courses.user_id", req.user.id).single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.post("/schedules", authenticateToken, async (req, res) => {
+app.post("/api/schedules", authenticateToken, async (req, res) => {
   const { course_id, day, start_time, end_time, room } = req.body;
   if (!course_id || !day || !start_time || !end_time) return res.status(400).json({ error: "Data tidak lengkap" });
 
@@ -267,7 +267,7 @@ app.post("/schedules", authenticateToken, async (req, res) => {
   res.status(201).json(data[0]);
 });
 
-app.put("/schedules/:id", authenticateToken, async (req, res) => {
+app.put("/api/schedules/:id", authenticateToken, async (req, res) => {
   const { course_id, day, start_time, end_time, room } = req.body;
   
   const { data: schedule } = await supabase.from("schedules").select("*, courses!inner(user_id)").eq("id", req.params.id).eq("courses.user_id", req.user.id).single();
@@ -280,7 +280,7 @@ app.put("/schedules/:id", authenticateToken, async (req, res) => {
   res.json(data[0]);
 });
 
-app.delete("/schedules/:id", authenticateToken, async (req, res) => {
+app.delete("/api/schedules/:id", authenticateToken, async (req, res) => {
   const { data: schedule } = await supabase.from("schedules").select("*, courses!inner(user_id)").eq("id", req.params.id).eq("courses.user_id", req.user.id).single();
   if(!schedule) return res.status(403).json({ error: "Unauthorized" });
 
@@ -290,7 +290,7 @@ app.delete("/schedules/:id", authenticateToken, async (req, res) => {
 });
 
 // --- ASSIGNMENTS CRUD ---
-app.get("/assignments", authenticateToken, async (req, res) => {
+app.get("/api/assignments", authenticateToken, async (req, res) => {
   const { data: courses } = await supabase.from("courses").select("id").eq("user_id", req.user.id);
   const courseIds = courses ? courses.map(c => c.id) : [];
   
@@ -301,13 +301,13 @@ app.get("/assignments", authenticateToken, async (req, res) => {
   res.json(data);
 });
 
-app.get("/assignments/:id", authenticateToken, async (req, res) => {
+app.get("/api/assignments/:id", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("assignments").select("*, courses!inner(user_id)").eq("id", req.params.id).eq("courses.user_id", req.user.id).single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.post("/assignments", authenticateToken, async (req, res) => {
+app.post("/api/assignments", authenticateToken, async (req, res) => {
   const { course_id, title, description, deadline, status } = req.body;
   if (!course_id || !title || !deadline) return res.status(400).json({ error: "Data tidak lengkap" });
 
@@ -325,7 +325,7 @@ app.post("/assignments", authenticateToken, async (req, res) => {
   res.status(201).json(data[0]);
 });
 
-app.put("/assignments/:id", authenticateToken, async (req, res) => {
+app.put("/api/assignments/:id", authenticateToken, async (req, res) => {
   const { course_id, title, description, deadline, status } = req.body;
   
   if (deadline) {
@@ -347,7 +347,7 @@ app.put("/assignments/:id", authenticateToken, async (req, res) => {
   res.json(data[0]);
 });
 
-app.delete("/assignments/:id", authenticateToken, async (req, res) => {
+app.delete("/api/assignments/:id", authenticateToken, async (req, res) => {
   const { data: assignment } = await supabase.from("assignments").select("*, courses!inner(user_id)").eq("id", req.params.id).eq("courses.user_id", req.user.id).single();
   if(!assignment) return res.status(403).json({ error: "Unauthorized" });
 
@@ -357,11 +357,11 @@ app.delete("/assignments/:id", authenticateToken, async (req, res) => {
 });
 
 // --- PUSH NOTIFICATIONS ---
-app.get("/vapid-public-key", (req, res) => {
+app.get("/api/vapid-public-key", (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-app.post("/subscribe", authenticateToken, async (req, res) => {
+app.post("/api/subscribe", authenticateToken, async (req, res) => {
   const { subscription } = req.body;
   
   if (!subscription || !subscription.endpoint || !subscription.keys) {
@@ -381,7 +381,7 @@ app.post("/subscribe", authenticateToken, async (req, res) => {
   res.status(201).json({ message: "Subscribed successfully", data: data[0] });
 });
 
-app.post("/notify", authenticateToken, async (req, res) => {
+app.post("/api/notify", authenticateToken, async (req, res) => {
   const { title, body } = req.body;
 
   // Sends notification to self (the logged in user)
