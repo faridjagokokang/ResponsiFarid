@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyTrack</title>
+
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#4F46E5">
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <!-- AUTH SECTION (Visible when not logged in) -->
+    <div id="auth-container" class="auth-container">
+        <div class="auth-box glass-form">
+            <h1 class="logo-text">StudyTrack</h1>
+
+            <div id="login-section">
+                <h2>Masuk</h2>
+                <form id="form-login">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="login-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Kata Sandi</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem;">Masuk</button>
+                </form>
+                <p style="margin-top: 1rem; text-align: center; font-size: 0.875rem;">
+                    Belum punya akun? <a href="#" onclick="toggleAuth('register')">Daftar</a>
+                </p>
+            </div>
+
+            <div id="register-section" style="display: none;">
+                <h2>Daftar</h2>
+                <form id="form-register">
+                    <div class="form-group">
+                        <label>Nama</label>
+                        <input type="text" id="register-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="register-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Kata Sandi</label>
+                        <input type="password" id="register-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Program Studi</label>
+                        <input type="text" id="register-prodi" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fakultas</label>
+                        <input type="text" id="register-fakultas" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Kampus</label>
+                        <input type="text" id="register-kampus" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Foto Profil</label>
+                        <input type="file" id="register-foto" accept="image/*" required>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem;">Daftar</button>
+                </form>
+                <p style="margin-top: 1rem; text-align: center; font-size: 0.875rem;">
+                    Sudah punya akun? <a href="#" onclick="toggleAuth('login')">Masuk</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP (Hidden until logged in) -->
+    <div id="app-container" style="display: none; flex-direction: column; min-height: 100vh;">
+        <header class="app-header">
+            <div class="logo">
+                <h1 class="logo-text">StudyTrack</h1>
+            </div>
+            <nav class="app-nav">
+                <button class="nav-btn active" data-target="dashboard-section">Dashboard</button>
+                <button class="nav-btn" data-target="profile-section">Profil</button>
+                <button class="nav-btn" data-target="courses-section">Mata Kuliah</button>
+                <button class="nav-btn" data-target="schedules-section">Jadwal</button>
+                <button class="nav-btn" data-target="assignments-section">Tugas</button>
+                <button class="nav-btn" id="nav-admin" data-target="admin-section"
+                    style="display: none; color: #fca5a5;">Admin</button>
+                <button id="btn-subscribe" class="btn-primary">Aktifkan Notifikasi</button>
+                <button id="btn-logout" class="btn-cancel" style="width: auto; margin-top: 0;">Keluar</button>
+            </nav>
+        </header>
+
+        <main class="app-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="content-section active">
+                <h2>Dashboard Belajar 📊</h2>
+                <div class="glass-form"
+                    style="display: flex; justify-content: space-around; text-align: center; margin-bottom: 1rem;">
+                    <div>
+                        <h3 id="stat-completed" style="font-size: 2rem; color: #4ade80;">0</h3>
+                        <p>Tugas Selesai</p>
+                    </div>
+                    <div>
+                        <h3 id="stat-pending" style="font-size: 2rem; color: #fca5a5;">0</h3>
+                        <p>Tugas Menunggu</p>
+                    </div>
+                </div>
+                <div class="glass-form">
+                    <p style="margin-bottom: 0.5rem;" id="progress-text">Progress Tugas (0%)</p>
+                    <div
+                        style="width: 100%; height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                        <div id="dashboard-progress"
+                            style="width: 0%; height: 100%; background: #818cf8; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile-section" class="content-section">
+                <h2>Profil Saya</h2>
+                <div class="glass-form" id="profile-info">
+                    <p>Memuat profil...</p>
+                </div>
+            </section>
+
+            <!-- Admin Panel Section -->
+            <section id="admin-section" class="content-section"
+                style="border: 2px solid #818cf8; border-radius: 12px; padding: 1rem;">
+                <h2>Admin Panel - Data Pengguna 🛡️</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Foto</th>
+                                <th>Nama</th>
+                                <th>Email</th>
+                                <th>Prodi</th>
+                                <th>Fakultas</th>
+                                <th>Kampus</th>
+                                <th>Role</th>
+                                <th>Password (Hash)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-admin"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Courses Section -->
+            <section id="courses-section" class="content-section">
+                <h2>Kelola Mata Kuliah</h2>
+                <form id="form-course" class="glass-form">
+                    <input type="hidden" id="course-id">
+                    <div class="form-group">
+                        <label for="course-name">Nama Mata Kuliah</label>
+                        <input type="text" id="course-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="course-lecturer">Dosen</label>
+                        <input type="text" id="course-lecturer" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="course-credits">SKS</label>
+                        <input type="number" id="course-credits" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="course-semester">Semester</label>
+                        <input type="number" id="course-semester" required>
+                    </div>
+                    <button type="submit" class="btn-submit">Simpan Mata Kuliah</button>
+                    <button type="button" class="btn-cancel" onclick="resetForm('form-course')">Batal</button>
+                </form>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Mata Kuliah</th>
+                                <th>Dosen</th>
+                                <th>SKS</th>
+                                <th>Semester</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-courses"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Schedules Section -->
+            <section id="schedules-section" class="content-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="margin: 0;">Kelola Jadwal</h2>
+                    <select id="schedule-filter" onchange="fetchSchedules()"
+                        style="padding: 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: white;">
+                        <option value="All">Semua Hari</option>
+                        <option value="Senin">Senin</option>
+                        <option value="Selasa">Selasa</option>
+                        <option value="Rabu">Rabu</option>
+                        <option value="Kamis">Kamis</option>
+                        <option value="Jumat">Jumat</option>
+                        <option value="Sabtu">Sabtu</option>
+                        <option value="Minggu">Minggu</option>
+                    </select>
+                </div>
+                <form id="form-schedule" class="glass-form">
+                    <input type="hidden" id="schedule-id">
+                    <div class="form-group">
+                        <label for="schedule-course-id">Mata Kuliah</label>
+                        <select id="schedule-course-id" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="schedule-day">Hari</label>
+                        <select id="schedule-day" required>
+                            <option value="Senin">Senin</option>
+                            <option value="Selasa">Selasa</option>
+                            <option value="Rabu">Rabu</option>
+                            <option value="Kamis">Kamis</option>
+                            <option value="Jumat">Jumat</option>
+                            <option value="Sabtu">Sabtu</option>
+                            <option value="Minggu">Minggu</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="schedule-start">Waktu Mulai</label>
+                        <input type="time" id="schedule-start" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="schedule-end">Waktu Selesai</label>
+                        <input type="time" id="schedule-end" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="schedule-room">Ruangan</label>
+                        <input type="text" id="schedule-room" required>
+                    </div>
+                    <button type="submit" class="btn-submit">Simpan Jadwal</button>
+                    <button type="button" class="btn-cancel" onclick="resetForm('form-schedule')">Batal</button>
+                </form>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Mata Kuliah</th>
+                                <th>Hari</th>
+                                <th>Waktu</th>
+                                <th>Ruangan</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-schedules"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Assignments Section -->
+            <section id="assignments-section" class="content-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="margin: 0;">Kelola Tugas</h2>
+                    <select id="assignment-sort" onchange="fetchAssignments()"
+                        style="padding: 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: white;">
+                        <option value="deadline">Urutkan: Deadline</option>
+                        <option value="status">Urutkan: Status</option>
+                    </select>
+                </div>
+                <form id="form-assignment" class="glass-form">
+                    <input type="hidden" id="assignment-id">
+                    <div class="form-group">
+                        <label for="assignment-course-id">Mata Kuliah</label>
+                        <select id="assignment-course-id" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assignment-title">Judul</label>
+                        <input type="text" id="assignment-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="assignment-desc">Deskripsi</label>
+                        <textarea id="assignment-desc" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="assignment-deadline">Tenggat Waktu</label>
+                        <input type="date" id="assignment-deadline" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="assignment-status">Status</label>
+                        <select id="assignment-status" required>
+                            <option value="Pending">Menunggu</option>
+                            <option value="Selesai">Selesai</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-submit">Simpan Tugas</button>
+                    <button type="button" class="btn-cancel" onclick="resetForm('form-assignment')">Batal</button>
+                </form>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Selesai</th>
+                                <th>Mata Kuliah</th>
+                                <th>Judul</th>
+                                <th>Tenggat Waktu</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-assignments"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="./app.js"></script>
+</body>
+
+</html>
