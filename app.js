@@ -331,7 +331,7 @@ async function fetchAdminUsers() {
                 <td>${DOMPurify.sanitize(u.prodi || '-')}</td>
                 <td>${DOMPurify.sanitize(u.fakultas || '-')}</td>
                 <td>${DOMPurify.sanitize(u.kampus || '-')}</td>
-                <td><span style="background: ${u.role === 'admin' ? '#fca5a5' : '#818cf8'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${DOMPurify.sanitize(u.role)}</span></td>
+                <td><span class="badge ${u.role === 'admin' ? 'admin' : 'user'}">${DOMPurify.sanitize(u.role)}</span></td>
                 <td>
                     <button class="btn-cancel" onclick="deleteAdminUser('${u.id}')" style="padding: 4px 8px; font-size: 0.8rem; margin: 0;">Hapus</button>
                 </td>
@@ -604,7 +604,7 @@ function renderAssignments() {
                 <td>${DOMPurify.sanitize(assignment.courses?.course_name || 'Unknown')}</td>
                 <td style="${titleStyle}">${DOMPurify.sanitize(assignment.title)}</td>
                 <td>${DOMPurify.sanitize(assignment.deadline)}</td>
-                <td><span style="background: ${isDone ? '#4ade80' : '#fca5a5'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${DOMPurify.sanitize(assignment.status)}</span></td>
+                <td><span class="badge ${isDone ? 'success' : 'pending'}">${DOMPurify.sanitize(assignment.status)}</span></td>
                 <td class="action-buttons">
                     <button class="btn-edit" onclick="editAssignment(${assignment.id})">Ubah</button>
                     <button class="btn-delete" onclick="deleteAssignment(${assignment.id})">Hapus</button>
