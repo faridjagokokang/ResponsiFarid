@@ -34,13 +34,73 @@ function loadDataForSection(sectionId) {
 }
 
 // Toast Notification
-function showToast(message) {
+function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
+    
+    toast.classList.remove('success', 'error', 'warning', 'info');
+    toast.classList.add(type);
+    
     toast.classList.add('show');
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
+}
+
+// Loading State Helper
+function setLoading(buttonId, isLoading) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = 'Loading...';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'not-allowed';
+    } else {
+        btn.textContent = btn.dataset.originalText || 'Submit';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+    }
+}
+
+// Password Visibility Helper
+function togglePasswordVisibility(inputId, iconElement) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        iconElement.classList.remove('fa-eye');
+        iconElement.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        iconElement.classList.remove('fa-eye-slash');
+        iconElement.classList.add('fa-eye');
+    }
+}
+
+// Image Preview Helper
+function previewImage(event, previewId) {
+    const file = event.target.files[0];
+    if (file) {
+        if (!file.type.startsWith('image/')) {
+            showToast('File harus berupa gambar', 'error');
+            event.target.value = ''; // Reset input
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) { // 2MB limit
+            showToast('Ukuran file maksimal 2MB', 'warning');
+            event.target.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById(previewId);
+            img.src = e.target.result;
+            img.style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+    }
 }
 
 // Form Reset Helpers
@@ -93,12 +153,19 @@ function checkAuth() {
 }
 
 function toggleAuth(type) {
+    document.getElementById('login-section').style.display = 'none';
+    document.getElementById('register-section').style.display = 'none';
+    document.getElementById('forgot-password-section').style.display = 'none';
+    document.getElementById('reset-password-section').style.display = 'none';
+
     if (type === 'login') {
         document.getElementById('login-section').style.display = 'block';
-        document.getElementById('register-section').style.display = 'none';
-    } else {
-        document.getElementById('login-section').style.display = 'none';
+    } else if (type === 'register') {
         document.getElementById('register-section').style.display = 'block';
+    } else if (type === 'forgot-password') {
+        document.getElementById('forgot-password-section').style.display = 'block';
+    } else if (type === 'reset-password') {
+        document.getElementById('reset-password-section').style.display = 'block';
     }
 }
 
@@ -110,12 +177,12 @@ function logout() {
 
 document.getElementById('btn-logout').addEventListener('click', logout);
 
-// Auth Submit
 document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
 
+    setLoading('btn-login-submit', true);
     try {
         const res = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
@@ -126,14 +193,16 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
         if (res.ok) {
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
-            showToast('Berhasil masuk!');
+            showToast('Berhasil masuk!', 'success');
             checkAuth();
             resetForm('form-login');
         } else {
-            alert(data.error || 'Gagal masuk');
+            showToast(data.error || 'Gagal masuk', 'error');
         }
     } catch (err) {
-        console.error(err);
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-login-submit', false);
     }
 });
 
@@ -148,6 +217,7 @@ document.getElementById('form-register').addEventListener('submit', async (e) =>
     formData.append('kampus', document.getElementById('register-kampus').value);
     formData.append('foto', document.getElementById('register-foto').files[0]);
 
+    setLoading('btn-register-submit', true);
     try {
         const res = await fetch(`${API_URL}/auth/register`, {
             method: 'POST',
@@ -155,14 +225,70 @@ document.getElementById('form-register').addEventListener('submit', async (e) =>
         });
         const data = await res.json();
         if (res.ok) {
-            showToast('Pendaftaran berhasil! Silakan masuk.');
+            showToast('Pendaftaran berhasil! Silakan masuk.', 'success');
             toggleAuth('login');
             resetForm('form-register');
+            document.getElementById('preview-foto').style.display = 'none';
         } else {
-            alert(data.error || 'Gagal mendaftar');
+            showToast(data.error || 'Gagal mendaftar', 'error');
         }
     } catch (err) {
-        console.error(err);
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-register-submit', false);
+    }
+});
+
+// Forgot & Reset Password Submit
+document.getElementById('form-forgot-password').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgot-email').value;
+    setLoading('btn-forgot-submit', true);
+    try {
+        const res = await fetch(`${API_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            resetForm('form-forgot-password');
+            toggleAuth('login');
+        } else {
+            showToast(data.error || 'Gagal', 'error');
+        }
+    } catch (err) {
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-forgot-submit', false);
+    }
+});
+
+document.getElementById('form-reset-password').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token = document.getElementById('reset-token').value;
+    const newPassword = document.getElementById('reset-password').value;
+    setLoading('btn-reset-submit', true);
+    try {
+        const res = await fetch(`${API_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, newPassword })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            toggleAuth('login');
+            resetForm('form-reset-password');
+            window.history.replaceState({}, document.title, "/");
+        } else {
+            showToast(data.error || 'Gagal', 'error');
+        }
+    } catch (err) {
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-reset-submit', false);
     }
 });
 
@@ -170,15 +296,15 @@ document.getElementById('form-register').addEventListener('submit', async (e) =>
 async function fetchProfile() {
     try {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const fotoHtml = user.foto_url ? `<img src="${API_URL}${user.foto_url}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 2px solid var(--primary);">` : '';
+        const fotoHtml = user.foto_url ? `<img src="${DOMPurify.sanitize(user.foto_url.startsWith('http') ? user.foto_url : API_URL + user.foto_url)}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 2px solid var(--primary);">` : '';
         document.getElementById('profile-info').innerHTML = `
             <div style="text-align: center;">${fotoHtml}</div>
-            <p><strong>Name:</strong> ${user.name}</p>
-            <p><strong>Email:</strong> ${user.email}</p>
-            <p><strong>Role:</strong> ${user.role}</p>
-            <p><strong>Program Studi:</strong> ${user.prodi || '-'}</p>
-            <p><strong>Fakultas:</strong> ${user.fakultas || '-'}</p>
-            <p><strong>Kampus:</strong> ${user.kampus || '-'}</p>
+            <p><strong>Name:</strong> ${DOMPurify.sanitize(user.name)}</p>
+            <p><strong>Email:</strong> ${DOMPurify.sanitize(user.email)}</p>
+            <p><strong>Role:</strong> ${DOMPurify.sanitize(user.role)}</p>
+            <p><strong>Program Studi:</strong> ${DOMPurify.sanitize(user.prodi || '-')}</p>
+            <p><strong>Fakultas:</strong> ${DOMPurify.sanitize(user.fakultas || '-')}</p>
+            <p><strong>Kampus:</strong> ${DOMPurify.sanitize(user.kampus || '-')}</p>
         `;
     } catch (error) {
         console.error('Error fetching profile:', error);
@@ -192,21 +318,20 @@ async function fetchAdminUsers() {
         const data = await res.json();
         
         if (!res.ok) {
-            showToast(data.error || 'Gagal memuat admin. Silakan coba Keluar dan Masuk kembali.');
+            showToast(data.error || 'Gagal memuat admin. Silakan coba Keluar dan Masuk kembali.', 'error');
             return;
         }
 
         const tbody = document.getElementById('tbody-admin');
         tbody.innerHTML = data.map(u => `
             <tr>
-                <td>${u.foto_url ? `<img src="${API_URL}${u.foto_url}" style="width: 3cm; height: 4cm; border-radius: 4px; object-fit: cover;">` : '-'}</td>
-                <td>${u.name}</td>
-                <td>${u.email}</td>
-                <td>${u.prodi || '-'}</td>
-                <td>${u.fakultas || '-'}</td>
-                <td>${u.kampus || '-'}</td>
-                <td><span style="background: ${u.role === 'admin' ? '#fca5a5' : '#818cf8'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${u.role}</span></td>
-                <td style="font-size: 0.7rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${u.password}">${u.password}</td>
+                <td>${u.foto_url ? `<img src="${DOMPurify.sanitize(u.foto_url.startsWith('http') ? u.foto_url : API_URL + u.foto_url)}" style="width: 3cm; height: 4cm; border-radius: 4px; object-fit: cover;">` : '-'}</td>
+                <td>${DOMPurify.sanitize(u.name)}</td>
+                <td>${DOMPurify.sanitize(u.email)}</td>
+                <td>${DOMPurify.sanitize(u.prodi || '-')}</td>
+                <td>${DOMPurify.sanitize(u.fakultas || '-')}</td>
+                <td>${DOMPurify.sanitize(u.kampus || '-')}</td>
+                <td><span style="background: ${u.role === 'admin' ? '#fca5a5' : '#818cf8'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${DOMPurify.sanitize(u.role)}</span></td>
             </tr>
         `).join('');
     } catch (error) {
@@ -227,10 +352,10 @@ async function fetchCourses() {
         tbody.innerHTML = courses.map(course => `
             <tr>
                 <td>${course.id}</td>
-                <td>${course.course_name}</td>
-                <td>${course.lecturer}</td>
-                <td>${course.credits}</td>
-                <td>${course.semester}</td>
+                <td>${DOMPurify.sanitize(course.course_name)}</td>
+                <td>${DOMPurify.sanitize(course.lecturer)}</td>
+                <td>${DOMPurify.sanitize(String(course.credits))}</td>
+                <td>${DOMPurify.sanitize(String(course.semester))}</td>
                 <td class="action-buttons">
                     <button class="btn-edit" onclick="editCourse(${course.id})">Ubah</button>
                     <button class="btn-delete" onclick="deleteCourse(${course.id})">Hapus</button>
@@ -257,18 +382,24 @@ document.getElementById('form-course').addEventListener('submit', async (e) => {
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/courses/${id}` : `/courses`;
 
+    setLoading('btn-course-submit', true);
     try {
         const res = await authFetch(url, {
             method,
             body: JSON.stringify(data)
         });
         if (res.ok) {
-            showToast(id ? 'Mata Kuliah berhasil diperbarui!' : 'Mata Kuliah berhasil ditambahkan!');
+            showToast(id ? 'Mata Kuliah berhasil diperbarui!' : 'Mata Kuliah berhasil ditambahkan!', 'success');
             resetForm('form-course');
             fetchCourses();
+        } else {
+            const errData = await res.json();
+            showToast(errData.error || 'Gagal menyimpan', 'error');
         }
     } catch (error) {
-        console.error('Error saving course:', error);
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-course-submit', false);
     }
 });
 
@@ -325,10 +456,10 @@ async function fetchSchedules() {
         tbody.innerHTML = schedules.map(schedule => `
             <tr>
                 <td>${schedule.id}</td>
-                <td>${schedule.courses?.course_name || 'Unknown'}</td>
-                <td>${schedule.day}</td>
-                <td>${schedule.start_time} - ${schedule.end_time}</td>
-                <td>${schedule.room}</td>
+                <td>${DOMPurify.sanitize(schedule.courses?.course_name || 'Unknown')}</td>
+                <td>${DOMPurify.sanitize(schedule.day)}</td>
+                <td>${DOMPurify.sanitize(schedule.start_time)} - ${DOMPurify.sanitize(schedule.end_time)}</td>
+                <td>${DOMPurify.sanitize(schedule.room)}</td>
                 <td class="action-buttons">
                     <button class="btn-edit" onclick="editSchedule(${schedule.id})">Ubah</button>
                     <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Hapus</button>
@@ -336,7 +467,7 @@ async function fetchSchedules() {
             </tr>
         `).join('');
     } catch (error) {
-        console.error('Error fetching schedules:', error);
+        showToast('Terjadi kesalahan memuat jadwal', 'error');
     }
 }
 
@@ -354,18 +485,24 @@ document.getElementById('form-schedule').addEventListener('submit', async (e) =>
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/schedules/${id}` : `/schedules`;
 
+    setLoading('btn-schedule-submit', true);
     try {
         const res = await authFetch(url, {
             method,
             body: JSON.stringify(data)
         });
         if (res.ok) {
-            showToast(id ? 'Jadwal berhasil diperbarui!' : 'Jadwal berhasil ditambahkan!');
+            showToast(id ? 'Jadwal berhasil diperbarui!' : 'Jadwal berhasil ditambahkan!', 'success');
             resetForm('form-schedule');
             fetchSchedules();
+        } else {
+            const errData = await res.json();
+            showToast(errData.error || 'Gagal menyimpan', 'error');
         }
     } catch (error) {
-        console.error('Error saving schedule:', error);
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-schedule-submit', false);
     }
 });
 
@@ -389,11 +526,11 @@ async function deleteSchedule(id) {
     try {
         const res = await authFetch(`/schedules/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            showToast('Jadwal dihapus!');
+            showToast('Jadwal dihapus!', 'success');
             fetchSchedules();
         }
     } catch (error) {
-        console.error('Error deleting schedule:', error);
+        showToast('Terjadi kesalahan', 'error');
     }
 }
 
@@ -444,10 +581,10 @@ function renderAssignments() {
             return `
             <tr>
                 <td><input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggleAssignmentStatus(${assignment.id}, this.checked)"></td>
-                <td>${assignment.courses?.course_name || 'Unknown'}</td>
-                <td style="${titleStyle}">${assignment.title}</td>
-                <td>${assignment.deadline}</td>
-                <td><span style="background: ${isDone ? '#4ade80' : '#fca5a5'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${assignment.status}</span></td>
+                <td>${DOMPurify.sanitize(assignment.courses?.course_name || 'Unknown')}</td>
+                <td style="${titleStyle}">${DOMPurify.sanitize(assignment.title)}</td>
+                <td>${DOMPurify.sanitize(assignment.deadline)}</td>
+                <td><span style="background: ${isDone ? '#4ade80' : '#fca5a5'}; color: black; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${DOMPurify.sanitize(assignment.status)}</span></td>
                 <td class="action-buttons">
                     <button class="btn-edit" onclick="editAssignment(${assignment.id})">Ubah</button>
                     <button class="btn-delete" onclick="deleteAssignment(${assignment.id})">Hapus</button>
@@ -477,9 +614,11 @@ async function toggleAssignmentStatus(id, isChecked) {
         });
         if (res.ok) {
             fetchAssignments();
+        } else {
+            showToast('Gagal mengubah status', 'error');
         }
     } catch (error) {
-        console.error('Error toggling status:', error);
+        showToast('Terjadi kesalahan koneksi', 'error');
     }
 }
 
@@ -497,18 +636,24 @@ document.getElementById('form-assignment').addEventListener('submit', async (e) 
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/assignments/${id}` : `/assignments`;
 
+    setLoading('btn-assignment-submit', true);
     try {
         const res = await authFetch(url, {
             method,
             body: JSON.stringify(data)
         });
         if (res.ok) {
-            showToast(id ? 'Tugas berhasil diperbarui!' : 'Tugas berhasil ditambahkan!');
+            showToast(id ? 'Tugas berhasil diperbarui!' : 'Tugas berhasil ditambahkan!', 'success');
             resetForm('form-assignment');
             fetchAssignments();
+        } else {
+            const errData = await res.json();
+            showToast(errData.error || 'Gagal menyimpan', 'error');
         }
     } catch (error) {
-        console.error('Error saving assignment:', error);
+        showToast('Terjadi kesalahan koneksi', 'error');
+    } finally {
+        setLoading('btn-assignment-submit', false);
     }
 });
 
@@ -532,11 +677,11 @@ async function deleteAssignment(id) {
     try {
         const res = await authFetch(`/assignments/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            showToast('Tugas dihapus!');
+            showToast('Tugas dihapus!', 'success');
             fetchAssignments();
         }
     } catch (error) {
-        console.error('Error deleting assignment:', error);
+        showToast('Terjadi kesalahan', 'error');
     }
 }
 
@@ -610,4 +755,11 @@ document.getElementById('btn-subscribe').addEventListener('click', async () => {
 });
 
 // Initial boot
-checkAuth();
+const urlParams = new URLSearchParams(window.location.search);
+const resetToken = urlParams.get('token');
+if (resetToken) {
+    document.getElementById('reset-token').value = resetToken;
+    toggleAuth('reset-password');
+} else {
+    checkAuth();
+}

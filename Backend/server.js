@@ -7,19 +7,11 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import cron from "node-cron";
-import fs from "fs";
-import path from "path";
+import rateLimit from "express-rate-limit";
+import nodemailer from "nodemailer";
 
-// Setup Multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
+// Setup Multer for memory uploads (Supabase Storage)
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 dotenv.config();
@@ -28,7 +20,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -59,13 +50,41 @@ function authenticateToken(req, res, next) {
 }
 
 // --- AUTH (LOGIN / REGISTER) ---
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: { error: "Terlalu banyak percobaan login, silakan coba lagi setelah 15 menit." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.post("/auth/register", upload.single("foto"), async (req, res) => {
   const { name, email, password, prodi, fakultas, kampus } = req.body;
   if (!name || !email || !password || !prodi || !fakultas || !kampus || !req.file) {
     return res.status(400).json({ error: "Semua field dan foto harus diisi" });
   }
 
-  const foto_url = '/uploads/' + req.file.filename;
+  let foto_url = '';
+  try {
+    const fileName = `profile_${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
+    const { data: storageData, error: storageError } = await supabase
+        .storage
+        .from('avatars')
+        .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: false
+        });
+        
+    if (storageError) {
+        return res.status(500).json({ error: "Gagal mengunggah foto profil: " + storageError.message });
+    }
+    
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+    foto_url = publicUrlData.publicUrl;
+  } catch(err) {
+      return res.status(500).json({ error: "Server error saat upload" });
+  }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -84,7 +103,7 @@ app.post("/auth/register", upload.single("foto"), async (req, res) => {
   }
 });
 
-app.post("/auth/login", async (req, res) => {
+app.post("/auth/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Email dan password harus diisi" });
 
@@ -103,6 +122,62 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
+// --- FORGOT PASSWORD ---
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: process.env.SMTP_PORT || 587,
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+app.post("/auth/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email harus diisi" });
+
+  const { data: user, error } = await supabase.from("users").select("id, email").eq("email", email).single();
+  if (error || !user) return res.status(400).json({ error: "Email tidak terdaftar" });
+
+  const resetToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '15m' });
+  
+  try {
+    if(process.env.SMTP_USER) {
+      await transporter.sendMail({
+        from: `"StudyTrack Support" <${process.env.SMTP_USER}>`,
+        to: user.email,
+        subject: "Reset Password - StudyTrack",
+        text: `Anda meminta reset password. Gunakan token ini untuk reset:\n\n${resetToken}\n\nToken berlaku selama 15 menit.`,
+        html: `<p>Anda meminta reset password. Gunakan token di bawah ini untuk reset:</p><p style="padding:10px; background:#f3f4f6; border-radius:4px; font-weight:bold; word-break:break-all;">${resetToken}</p><p>Token berlaku selama 15 menit.</p>`
+      });
+    } else {
+        console.log("Mock Email Sent with Reset Token:", resetToken);
+    }
+    res.json({ message: "Instruksi reset password telah dikirim ke email Anda. (Cek console log jika SMTP belum diatur)" });
+  } catch (err) {
+    console.error("Email Error:", err);
+    res.status(500).json({ error: "Gagal mengirim email reset" });
+  }
+});
+
+app.post("/auth/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) return res.status(400).json({ error: "Token dan password baru harus diisi" });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    const { error } = await supabase.from("users").update({ password: hashedPassword }).eq("id", decoded.id);
+    if (error) return res.status(500).json({ error: "Gagal mereset password" });
+    
+    res.json({ message: "Password berhasil direset. Silakan login." });
+  } catch (err) {
+    res.status(400).json({ error: "Token tidak valid atau sudah kedaluwarsa" });
+  }
+});
+
 // --- USERS CRUD ---
 app.get("/users/me", authenticateToken, async (req, res) => {
   const { data, error } = await supabase.from("users").select("id, name, email").eq("id", req.user.id).single();
@@ -113,7 +188,7 @@ app.get("/users/me", authenticateToken, async (req, res) => {
 // --- ADMIN ROUTE ---
 app.get("/admin/users", authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: "Forbidden: Admin only" });
-  const { data, error } = await supabase.from("users").select("id, name, email, prodi, fakultas, kampus, foto_url, password, created_at, role");
+  const { data, error } = await supabase.from("users").select("id, name, email, prodi, fakultas, kampus, foto_url, created_at, role");
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -237,6 +312,13 @@ app.post("/assignments", authenticateToken, async (req, res) => {
   const { course_id, title, description, deadline, status } = req.body;
   if (!course_id || !title || !deadline) return res.status(400).json({ error: "Data tidak lengkap" });
 
+  const selectedDate = new Date(deadline);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (selectedDate < today) {
+    return res.status(400).json({ error: "Tenggat waktu tidak boleh di masa lalu" });
+  }
+
   if (!(await verifyUserCourse(course_id, req.user.id))) return res.status(403).json({ error: "Invalid course" });
 
   const { data, error } = await supabase.from("assignments").insert([{ course_id, title, description, deadline, status }]).select();
@@ -246,6 +328,15 @@ app.post("/assignments", authenticateToken, async (req, res) => {
 
 app.put("/assignments/:id", authenticateToken, async (req, res) => {
   const { course_id, title, description, deadline, status } = req.body;
+  
+  if (deadline) {
+    const selectedDate = new Date(deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      return res.status(400).json({ error: "Tenggat waktu tidak boleh di masa lalu" });
+    }
+  }
   
   const { data: assignment } = await supabase.from("assignments").select("*, courses!inner(user_id)").eq("id", req.params.id).eq("courses.user_id", req.user.id).single();
   if(!assignment) return res.status(403).json({ error: "Unauthorized" });
