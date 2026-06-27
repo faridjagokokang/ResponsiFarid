@@ -62,7 +62,7 @@ CREATE TABLE push_subscriptions (
 
 INSERT INTO users(name,email,password,role)
 VALUES
-('Farid','farid@gmail.com','$2b$10$DrRA8673yfdPQ9A5kD45Guj8VpxcL/TuI0F9LJQ6HblkATes8v5Iq','admin');
+('Farid','farid@gmail.com','$2b$10$n3uYiEcsC6/wqZEfHIvw..mWslUTgaYHvPhqGiRgjSBrCoGjijF1K','admin');
 
 INSERT INTO courses(user_id,course_name,lecturer,credits,semester)
 VALUES
